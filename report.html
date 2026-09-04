@@ -71,6 +71,7 @@
     border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums;
   }
   .tag.drop { background: var(--down-bg); border-color: transparent; color: var(--down); font-weight: 600; }
+  .tag.deal { border-color: var(--down); color: var(--down); font-weight: 600; }
   .more { display: block; margin: 0 auto 50px; padding: 9px 20px; font: inherit; cursor: pointer;
           background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
   .empty { max-width: 1400px; margin: 40px auto; padding: 0 18px; color: var(--muted); }
@@ -97,6 +98,7 @@
   <label>Quartier <select id="district"></select></label>
   <label>Recherche <input type="search" id="q" placeholder="nom de résidence…"></label>
   <label>Tri <select id="sort">
+      <option value="affaire">meilleure affaire</option>
       <option value="price">prix croissant</option>
       <option value="-price">prix décroissant</option>
       <option value="sqm">€ / m² croissant</option>
@@ -127,6 +129,29 @@ const nf = new Intl.NumberFormat('fr-FR');
 const drop = l => l.prices ? l.prices.at(-1)[1] - l.prices[0][1] : 0;
 const perSqm = l => (l.area_sqm && l.price_eur) ? l.price_eur / l.area_sqm : Infinity;
 
+// Médiane du €/m² par quartier, calculée une fois au chargement plutôt que servie dans
+// les données : 3600 valeurs dérivables coûtent moins cher à recalculer qu'à transporter.
+// Les quartiers trop peu fournis sont écartés — une médiane sur 4 annonces ne dit rien.
+const MEDIANES = (() => {
+  const par = {}, out = {};
+  for (const l of DATA) {
+    const v = perSqm(l);
+    if (isFinite(v) && l.district) (par[l.district] ??= []).push(v);
+  }
+  for (const [d, vs] of Object.entries(par)) {
+    if (vs.length < 10) continue;
+    vs.sort((a, b) => a - b);
+    out[d] = vs[Math.floor(vs.length / 2)];
+  }
+  return out;
+})();
+
+// 0,77 = 23 % moins cher au m² que la médiane de son quartier. Infinity = non comparable.
+const affaire = l => {
+  const m = MEDIANES[l.district], v = perSqm(l);
+  return (m && isFinite(v)) ? v / m : Infinity;
+};
+
 $('sub').textContent =
   `${nf.format(META.total)} annonces · collectées du ${META.first} au ${META.last} · `
   + `page générée le ${META.generated} · taux ${META.rate} THB/€`;
@@ -135,8 +160,8 @@ const districts = [...new Set(DATA.map(l => l.district).filter(Boolean))].sort()
 $('district').innerHTML = '<option value="">tous</option>'
   + districts.map(d => `<option>${d}</option>`).join('');
 
-$('budget').value = META.budget_max;
-$('area').value = 0;
+$('budget').value = META.budget_target;
+$('area').value = META.area_min;
 
 function filtered() {
   const budget = +$('budget').value, area = +$('area').value;
@@ -156,6 +181,7 @@ function filtered() {
   );
 
   const by = {
+    'affaire': (a, b) => affaire(a) - affaire(b),
     'price':  (a, b) => a.price_thb - b.price_thb,
     '-price': (a, b) => b.price_thb - a.price_thb,
     'sqm':    (a, b) => perSqm(a) - perSqm(b),
@@ -176,6 +202,13 @@ function card(l) {
     l.floor ? `ét. ${l.floor}` : '',
     isFinite(sqm) ? `${Math.round(sqm)} €/m²` : '',
   ].filter(Boolean).map(t => `<span class="tag">${t}</span>`);
+  // Écart à la médiane du quartier : sous −15 % c'est une affaire, au-dessus de +15 %
+  // c'est cher pour le coin. Entre les deux il n'y a rien à signaler.
+  const a = affaire(l);
+  if (isFinite(a) && (a <= 0.85 || a >= 1.15)) {
+    const pct = Math.round((a - 1) * 100);
+    tags.unshift(`<span class="tag${pct < 0 ? ' deal' : ''}">${pct > 0 ? '+' : ''}${pct} % / ${l.district}</span>`);
+  }
   if (d < 0) tags.unshift(`<span class="tag drop">↓ ${nf.format(-d)} ฿ depuis le ${l.prices[0][0]}</span>`);
 
   const img = l.photos

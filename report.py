@@ -59,7 +59,10 @@ def build() -> tuple[str, dict, int]:
         "last": span[1],
         "generated": date.today().isoformat(),
         "rate": cfg["eur_thb_rate"],
-        "budget_max": cfg["budget_max_thb"],
+        # Les curseurs démarrent sur les critères réels du config, pas sur des valeurs
+        # arbitraires : le budget sur la cible, la surface sur le minimum.
+        "budget_target": cfg["budget_target_thb"],
+        "area_min": cfg["area_min_sqm"],
     }
     html = (ROOT / "report.html").read_text("utf-8")
     for token, value in (("__DATA__", listings), ("__META__", meta)):
