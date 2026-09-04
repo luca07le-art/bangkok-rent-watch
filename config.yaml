@@ -3,8 +3,11 @@
 # Filtres durs
 bedrooms_min: 2
 bathrooms_min: 2
-budget_max_thb: 50000        # au-delà : éliminé du scoring, mais toujours stocké
-budget_target_thb: 45000     # au-delà : pénalité progressive sur l'axe prix
+# Le budget se raisonne en euros : c'est la devise du locataire, pas celle du marché.
+# Les loyers thaïs sont convertis via eur_thb_rate. 800 €/mois = 29 600 THB au taux du 2026-09-01.
+# Les annonces au-dessus restent collectées et stockées : les médianes par quartier doivent
+# porter sur tout le segment, pas sur le seul budget, sinon elles ne comparent plus rien.
+budget_max_eur: 800
 
 # Filtres souples (lus par le scoring, phase 2)
 area_min_sqm: 60
@@ -34,7 +37,7 @@ sources:
     enabled: true
     region_code: TH10        # Bangkok
     # La requête ne pose pas de plafond de prix : le §3 veut que les annonces au-dessus de
-    # budget_max_thb soient stockées pour l'historique. Filtrer ici fausserait les médianes
+    # budget_max_eur soient stockées pour l'historique. Filtrer ici fausserait les médianes
     # par district du §8, qui doivent porter sur tout le segment et pas sur le seul budget.
     max_pages: 40            # ~22 annonces/page ; le segment 2ch/2sdb complet fait ~500 pages
 

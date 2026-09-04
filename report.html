@@ -86,7 +86,7 @@
 
 <div class="filters"><div class="in">
   <label>Budget max <span class="val" id="vBudget"></span>
-    <input type="range" id="budget" min="5000" max="120000" step="1000"></label>
+    <input type="range" id="budget" min="200" max="3000" step="25"></label>
   <label>Surface min <span class="val" id="vArea"></span>
     <input type="range" id="area" min="0" max="200" step="5"></label>
   <label>Chambres
@@ -160,7 +160,7 @@ const districts = [...new Set(DATA.map(l => l.district).filter(Boolean))].sort()
 $('district').innerHTML = '<option value="">tous</option>'
   + districts.map(d => `<option>${d}</option>`).join('');
 
-$('budget').value = META.budget_target;
+$('budget').value = META.budget_max_eur;
 $('area').value = META.area_min;
 
 function filtered() {
@@ -170,7 +170,7 @@ function filtered() {
   const photo = $('withPhoto').checked, dropOnly = $('onlyDrop').checked;
 
   let out = DATA.filter(l =>
-    (l.price_thb ?? 0) <= budget
+    (l.price_eur ?? 0) <= budget
     && (l.area_sqm ?? 0) >= area
     && (l.bedrooms ?? 0) >= beds
     && (l.bathrooms ?? 0) >= baths
@@ -232,7 +232,8 @@ function render() {
   $('grid').innerHTML = rows.slice(0, shown).map(card).join('');
   $('more').hidden = rows.length <= shown;
   $('empty').hidden = rows.length > 0;
-  $('vBudget').textContent = nf.format(+$('budget').value) + ' ฿';
+  const eur = +$('budget').value;
+  $('vBudget').textContent = `${nf.format(eur)} € · ${nf.format(Math.round(eur * META.rate))} ฿`;
   $('vArea').textContent = $('area').value + ' m²';
 }
 

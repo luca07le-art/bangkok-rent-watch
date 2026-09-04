@@ -60,8 +60,9 @@ def build() -> tuple[str, dict, int]:
         "generated": date.today().isoformat(),
         "rate": cfg["eur_thb_rate"],
         # Les curseurs démarrent sur les critères réels du config, pas sur des valeurs
-        # arbitraires : le budget sur la cible, la surface sur le minimum.
-        "budget_target": cfg["budget_target_thb"],
+        # arbitraires. Le budget est en euros — la devise dans laquelle le loyer est payé —
+        # et `rate` sert à afficher l'équivalent en bahts sous le curseur.
+        "budget_max_eur": cfg["budget_max_eur"],
         "area_min": cfg["area_min_sqm"],
     }
     html = (ROOT / "report.html").read_text("utf-8")
