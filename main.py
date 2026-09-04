@@ -14,10 +14,10 @@ import yaml
 
 import store
 from fetch import Fetcher, RobotsDenied
-from scrapers import ddproperty, propertyhub
+from scrapers import ddproperty, propertyhub, renthub
 
 ROOT = Path(__file__).parent
-SCRAPERS = {"ddproperty": ddproperty, "propertyhub": propertyhub}
+SCRAPERS = {"ddproperty": ddproperty, "propertyhub": propertyhub, "renthub": renthub}
 
 
 def run_source(name: str, scraper, cfg: dict, fetcher: Fetcher, conn) -> Counter:
@@ -33,10 +33,20 @@ def run_source(name: str, scraper, cfg: dict, fetcher: Fetcher, conn) -> Counter
             tally["erreur"] += 1
             continue
 
-        records = scraper.parse(html)
+        try:
+            records = scraper.parse(html)
+        except Exception as exc:  # structure inattendue chez la source
+            # Une seule page mal formée ne doit pas emporter la passe entière : le crawl
+            # hebdomadaire tourne sans surveillance, et tout ce qui précède serait perdu.
+            print(f"  page illisible {url} : {exc}")
+            tally["erreur"] += 1
+            continue
+
         if not records:
             print(f"  0 annonce sur {url} — fin de pagination ou zone inconnue")
             tally["vide"] += 1
+            if getattr(scraper, "STOP_ON_EMPTY", False):
+                break
             continue
 
         for rec in records:

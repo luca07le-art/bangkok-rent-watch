@@ -40,14 +40,17 @@ sources:
     # La requête ne pose pas de plafond de prix : le §3 veut que les annonces au-dessus de
     # budget_max_eur soient stockées pour l'historique. Filtrer ici fausserait les médianes
     # par district du §8, qui doivent porter sur tout le segment et pas sur le seul budget.
-    max_pages: 40            # ~22 annonces/page ; le segment 2ch/2sdb complet fait ~500 pages
+    # Verifie le 2026-09-04 : la page 400 rend encore 20 annonces, toutes distinctes et
+    # absentes a 90 % de la base. La pagination ne se tarit pas, donc ce plafond est un
+    # budget de temps, pas une fin de catalogue : 250 pages ~ 15 min a 3,5 s la requete.
+    max_pages: 250
 
   propertyhub:
     enabled: true
-    # ponytail: pagination SSR non résolue (le serveur force page=1, la pagination est
-    # cliente contre api.propertyhub.in.th) — cf. docs/phase0-faisabilite.md.
-    # On prend donc la page 1 de chaque zone : 60 annonces par station, ~1200 par passe.
-    # À remplacer par une vraie pagination si la couverture s'avère insuffisante.
+    # Pagination résolue le 2026-09-04 : elle passe par un segment d'URL (`/bangkok/2`),
+    # pas par `?page=2` qui est ignoré. La zone `bangkok` compte 2413 pages à elle seule,
+    # donc ce plafond est un budget de temps. 20 zones x 5 pages = 100 requêtes, ~6 min.
+    max_pages_per_zone: 5
     zones:
       - bangkok
       - bts-asok
@@ -74,6 +77,23 @@ sources:
   fazwaz:
     enabled: false           # HTML parsable, mais prix localisés par IP : à écrire ensuite
   renthub:
-    enabled: false           # modèle immeuble et non annonce : mapping à part
+    # Activée le 2026-09-04. Pas pour le volume : c'est la seule source qui expose la durée
+    # de bail (`shortContract`, paliers 1/3/6 mois) et la distance à la station en mètres.
+    # Modèle immeuble et non annonce : ni chambres ni surface — cf. scrapers/renthub.py.
+    enabled: true
+    max_pages_per_zone: 4
+    zones:
+      - bts-asok
+      - bts-phrom-phong
+      - bts-thong-lo-thong-lor
+      - bts-nana
+      - bts-phloen-chit
+      - bts-on-nut
+      - bts-ekkamai
+      - mrt-sukhumvit
+      - mrt-phetchaburi
+      - mrt-huai-khwang
+      - mrt-lat-phrao
+      - mrt-phra-ram-9
   hipflat:
     enabled: false           # Cloudflare, 403 jusque sur robots.txt — abandonnée

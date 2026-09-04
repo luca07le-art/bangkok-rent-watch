@@ -18,12 +18,14 @@ import yaml
 
 ROOT = Path(__file__).parent
 
-# Les colonnes servies au navigateur. Les 15 colonnes à 0 % (lat/lng, station, meublé, bail,
-# agent, description) ne sont peuplées que par les fiches annonces : rien à afficher tant que
-# la phase 2 ne les collecte pas.
+# Les colonnes servies au navigateur. `min_lease_months` et `station_distance_m` ne sont
+# remplies que par Renthub : nulles ailleurs, et c'est justement ce qui les rend utiles.
+# Restent à 0 % — donc absentes d'ici — lat/lng, meublé, dépôt, agent et description :
+# elles n'existent que sur les fiches annonces, une requête par annonce (phase 2).
 QUERY = """
 SELECT l.id, l.url, l.source, l.district, l.first_seen, l.last_seen,
        l.price_thb, l.price_eur, l.bedrooms, l.bathrooms, l.area_sqm, l.floor, l.photos,
+       l.min_lease_months, l.nearest_station, l.station_distance_m,
        COALESCE(l.project_name, l.title_raw) AS name
 FROM listings l
 WHERE l.price_thb IS NOT NULL

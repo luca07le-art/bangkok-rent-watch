@@ -7,6 +7,7 @@ c'est ici que ça casse — pas silencieusement en base.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -15,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import store  # noqa: E402
-from scrapers import ddproperty, propertyhub  # noqa: E402
+from scrapers import ddproperty, propertyhub, renthub  # noqa: E402
 
 FIXTURES = ROOT / "tests" / "fixtures"
 
@@ -54,6 +55,38 @@ def test_propertyhub():
     assert not any(d.endswith("Bangkok") for d in districts), districts
     print(f"propertyhub : {len(recs)} annonces, {min(r['price_thb'] for r in recs)}–"
           f"{max(r['price_thb'] for r in recs)} THB, districts {sorted(districts)[:3]}...")
+
+
+def test_renthub():
+    recs = renthub.parse((FIXTURES / "renthub_zone.html").read_text("utf-8"))
+    assert len(recs) >= 30, f"40 immeubles par page de zone, {len(recs)} parsés"
+    for r in recs:
+        assert r["url"].startswith("https://www.renthub.in.th/en/"), r["url"]
+        assert r["price_thb"] > 0, r["price_thb"]
+        assert r["nearest_station"], r
+        # La distance à la station est la raison d'être de cette source : elle remplit une
+        # colonne que les deux autres laissent vide. Si elle disparaît, le test doit tomber.
+        assert isinstance(r["station_distance_m"], int), r["station_distance_m"]
+
+    # Le bail court est l'autre raison d'être : sans lui, activer Renthub n'a pas de sens.
+    court = [r for r in recs if r["min_lease_months"]]
+    assert court, "aucun bail court trouvé — le champ shortTerm a dû changer de forme"
+    assert all(r["min_lease_months"] in (1, 3, 6) for r in court), court[:2]
+    # Un immeuble sans bail court doit rester à None, jamais à 12 : l'absence n'est pas une
+    # durée, et la confondre ferait trier le classement sur du bruit.
+    assert all(r["min_lease_months"] is None for r in recs if r not in court)
+    print(f"renthub : {len(recs)} immeubles, {len(court)} à bail court, "
+          f"stations {sorted({r['nearest_station'] for r in recs})[:2]}")
+
+
+def test_renthub_slug_inconnu():
+    """Un slug de zone invalide renvoie la page d'accueil, pas une erreur : `listings` y est
+    un dict. Le parser doit rendre une liste vide, jamais planter — c'est ce qui avait
+    interrompu la passe du 2026-09-04 après 350 pages déjà collectées."""
+    accueil = '<script id="__NEXT_DATA__">' + json.dumps(
+        {"props": {"pageProps": {"listings": {"highlightListings": [{"id": "1"}]}, "zone": None}}}
+    ) + "</script>"
+    assert renthub.parse(accueil) == []
 
 
 def test_propertyhub_page_without_data():

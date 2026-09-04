@@ -12,6 +12,10 @@ from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
 
+# Les pages sont sequentielles : une page vide signifie la fin du catalogue, et continuer
+# jusqu a max_pages ne ferait que gaspiller des requetes chez eux.
+STOP_ON_EMPTY = True
+
 BASE = "https://www.ddproperty.com/en/property-for-rent"
 DIGITS = re.compile(r"[\d.]+")
 

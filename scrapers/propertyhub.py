@@ -1,12 +1,16 @@
 """PropertyHub — Next.js : les annonces sont déjà en JSON dans la page (`__NEXT_DATA__`).
 
 robots.txt autorise tout le site. 60 annonces par page, structure la plus propre des cinq sources.
-Le filtrage et la pagination sont côté client : on interroge donc une zone par station.
+Le filtrage reste côté client, mais la pagination se fait par segment d'URL (cf. urls()).
 """
 from __future__ import annotations
 
 import json
 import re
+
+# Chaque URL est une zone independante : une zone vide (slug inconnu) ne dit rien des
+# suivantes, on continue.
+STOP_ON_EMPTY = False
 
 BASE = "https://propertyhub.in.th/en/condo-for-rent/"
 LISTING = "https://propertyhub.in.th/en/listings/"
@@ -15,8 +19,20 @@ NEXT_DATA = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
 
 
 def urls(cfg: dict):
-    for zone in cfg["sources"]["propertyhub"]["zones"]:
-        yield BASE + zone
+    """Une URL par page et par zone.
+
+    La pagination passe par un SEGMENT d'URL (`/bangkok/2`), pas par `?page=2` — ce dernier
+    est silencieusement ignore et rend toujours la page 1. C'est ce qui avait fait conclure
+    en phase 0 que la pagination etait purement cliente.
+
+    Les pages se recouvrent : les annonces `sponsorPackage` sont reinjectees a chaque page
+    (32 communes entre la page 3 et la page 50, toutes sponsorisees). `store.upsert` les
+    dedoublonne, le cout est en bande passante, pas en donnees fausses.
+    """
+    s = cfg["sources"]["propertyhub"]
+    for zone in s["zones"]:
+        for page in range(1, s["max_pages_per_zone"] + 1):
+            yield BASE + zone if page == 1 else f"{BASE}{zone}/{page}"
 
 
 def parse(html: str) -> list[dict]:

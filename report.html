@@ -72,6 +72,7 @@
   }
   .tag.drop { background: var(--down-bg); border-color: transparent; color: var(--down); font-weight: 600; }
   .tag.deal { border-color: var(--down); color: var(--down); font-weight: 600; }
+  .tag.bail { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
   .more { display: block; margin: 0 auto 50px; padding: 9px 20px; font: inherit; cursor: pointer;
           background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
   .empty { max-width: 1400px; margin: 40px auto; padding: 0 18px; color: var(--muted); }
@@ -109,6 +110,7 @@
   <div class="checks">
     <label><input type="checkbox" id="withPhoto" checked> avec photo</label>
     <label><input type="checkbox" id="onlyDrop"> baisse de prix</label>
+    <label><input type="checkbox" id="bailCourt"> bail court</label>
   </div>
 </div></div>
 
@@ -168,12 +170,17 @@ function filtered() {
   const beds = +$('beds').value, baths = +$('baths').value;
   const dist = $('district').value, q = $('q').value.trim().toLowerCase();
   const photo = $('withPhoto').checked, dropOnly = $('onlyDrop').checked;
+  const bailCourt = $('bailCourt').checked;
 
   let out = DATA.filter(l =>
     (l.price_eur ?? 0) <= budget
     && (l.area_sqm ?? 0) >= area
-    && (l.bedrooms ?? 0) >= beds
-    && (l.bathrooms ?? 0) >= baths
+    // Renthub décrit des immeubles : ni chambres ni salles de bain à ce niveau. Ces
+    // entrées ne sont donc pas filtrables dessus — elles n'apparaissent que quand on
+    // demande explicitement le bail court, qu'elles seules renseignent.
+    && (l.bedrooms == null ? bailCourt : l.bedrooms >= beds)
+    && (l.bedrooms == null ? bailCourt : (l.bathrooms ?? 0) >= baths)
+    && (!bailCourt || l.min_lease_months)
     && (!dist || l.district === dist)
     && (!photo || l.photos)
     && (!dropOnly || drop(l) < 0)
@@ -200,6 +207,7 @@ function card(l) {
     l.bathrooms ? `${l.bathrooms} sdb` : '',
     l.area_sqm ? `${l.area_sqm} m²` : '',
     l.floor ? `ét. ${l.floor}` : '',
+    l.station_distance_m ? `${l.station_distance_m} m de ${l.nearest_station}` : '',
     isFinite(sqm) ? `${Math.round(sqm)} €/m²` : '',
   ].filter(Boolean).map(t => `<span class="tag">${t}</span>`);
   // Écart à la médiane du quartier : sous −15 % c'est une affaire, au-dessus de +15 %
@@ -209,6 +217,8 @@ function card(l) {
     const pct = Math.round((a - 1) * 100);
     tags.unshift(`<span class="tag${pct < 0 ? ' deal' : ''}">${pct > 0 ? '+' : ''}${pct} % / ${l.district}</span>`);
   }
+  // Le bail court est l'information la plus rare du projet : elle passe devant tout.
+  if (l.min_lease_months) tags.unshift(`<span class="tag bail">bail ${l.min_lease_months} mois</span>`);
   if (d < 0) tags.unshift(`<span class="tag drop">↓ ${nf.format(-d)} ฿ depuis le ${l.prices[0][0]}</span>`);
 
   const img = l.photos
