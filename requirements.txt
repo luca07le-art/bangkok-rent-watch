@@ -1,0 +1,6 @@
+requests
+beautifulsoup4
+pyyaml
+
+# Différées : rapidfuzz (dedup) et jinja2 (rapport HTML) — phase 2.
+# playwright : inutile, aucune source ne l exige (cf. docs/phase0-faisabilite.md).

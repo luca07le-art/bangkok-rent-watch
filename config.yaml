@@ -1,0 +1,75 @@
+# bangkok-rent-watch — tous les seuils vivent ici, jamais dans le code.
+
+# Filtres durs
+bedrooms_min: 2
+bathrooms_min: 2
+budget_max_thb: 50000        # au-delà : éliminé du scoring, mais toujours stocké
+budget_target_thb: 45000     # au-delà : pénalité progressive sur l'axe prix
+
+# Filtres souples (lus par le scoring, phase 2)
+area_min_sqm: 60
+area_ideal_sqm: 70
+station_max_m: 800
+deposit_max_months: 2
+
+# Conversion
+eur_thb_rate: 37.0
+eur_thb_rate_updated: 2026-09-01
+
+# Séjour visé
+target_move_in: 2027-04-25
+target_move_out: 2027-08-31
+
+crawl:
+  # Ajoute ton email ici : le §5 demande un User-Agent identifiable et honnête, et c'est
+  # ce qui permet à une source de te contacter plutôt que de te bloquer.
+  user_agent: "bangkok-rent-watch/0.1 (recherche de logement personnelle)"
+  delay_min_s: 2
+  delay_max_s: 5
+  cache_ttl_hours: 24        # 0 pendant le dev = recrawl ; 24 = une passe par jour max
+  max_retries: 3
+
+sources:
+  ddproperty:
+    enabled: true
+    region_code: TH10        # Bangkok
+    # La requête ne pose pas de plafond de prix : le §3 veut que les annonces au-dessus de
+    # budget_max_thb soient stockées pour l'historique. Filtrer ici fausserait les médianes
+    # par district du §8, qui doivent porter sur tout le segment et pas sur le seul budget.
+    max_pages: 40            # ~22 annonces/page ; le segment 2ch/2sdb complet fait ~500 pages
+
+  propertyhub:
+    enabled: true
+    # ponytail: pagination SSR non résolue (le serveur force page=1, la pagination est
+    # cliente contre api.propertyhub.in.th) — cf. docs/phase0-faisabilite.md.
+    # On prend donc la page 1 de chaque zone : 60 annonces par station, ~1200 par passe.
+    # À remplacer par une vraie pagination si la couverture s'avère insuffisante.
+    zones:
+      - bangkok
+      - bts-asok
+      - bts-phrom-phong
+      - bts-thong-lo-thong-lor
+      - bts-on-nut
+      - bts-siam
+      - bts-chong-nonsi
+      - bts-saphan-taksin
+      - bts-surasak
+      - bts-saint-louis
+      - bts-udom-suk
+      - bts-bang-chak
+      - mrt-huai-khwang
+      - mrt-sutthisan
+      - mrt-lat-phrao
+      - mrt-sam-yan
+      - mrt-phra-ram-9
+      - mrt-hua-lamphong
+      - mrt-ratchadaphisek
+      - mrt-thailand-cultural-centre
+
+  # Désactivées en phase 1 — cf. docs/phase0-faisabilite.md
+  fazwaz:
+    enabled: false           # HTML parsable, mais prix localisés par IP : à écrire ensuite
+  renthub:
+    enabled: false           # modèle immeuble et non annonce : mapping à part
+  hipflat:
+    enabled: false           # Cloudflare, 403 jusque sur robots.txt — abandonnée

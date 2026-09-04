@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Bangkok — locations</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #fff; --ink: #1a1a19; --muted: #6b6b66;
+    --line: #e2e2dd; --accent: #b4530a; --down: #1f7a3d; --down-bg: #e7f4ec;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --card: #201f1d; --ink: #eceae6; --muted: #9a978f;
+      --line: #322f2c; --accent: #f0913f; --down: #6cc98c; --down-bg: #1d3226;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.25);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header { padding: 22px 18px 14px; max-width: 1400px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); font-size: 12px; }
+
+  .filters {
+    position: sticky; top: 0; z-index: 5; background: var(--bg);
+    border-bottom: 1px solid var(--line); padding: 10px 18px;
+  }
+  .filters .in { max-width: 1400px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end; }
+  label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+  select, input[type=search] {
+    font: inherit; font-size: 15px; padding: 5px 8px; border: 1px solid var(--line);
+    border-radius: 7px; background: var(--card); color: var(--ink); min-width: 130px;
+  }
+  input[type=range] { width: 150px; accent-color: var(--accent); }
+  .val { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .checks { display: flex; gap: 14px; }
+  .checks label { flex-direction: row; align-items: center; gap: 5px; color: var(--ink); font-size: 15px; }
+  input[type=checkbox] { accent-color: var(--accent); }
+
+  #count { max-width: 1400px; margin: 16px auto 0; padding: 0 18px; font-size: 12px; color: var(--muted); }
+
+  .grid {
+    max-width: 1400px; margin: 10px auto 40px; padding: 0 18px; display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column;
+    text-decoration: none; color: inherit; transition: transform .12s, box-shadow .12s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,.1); }
+  .ph { aspect-ratio: 4/3; width: 100%; object-fit: cover; background: var(--line); display: block; }
+  .ph.none {
+    display: grid; place-items: center; color: var(--muted); font-size: 12px;
+  }
+  .body { padding: 11px 13px 13px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+  .price { font-size: 19px; font-weight: 660; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .price small { font-weight: 400; color: var(--muted); font-size: 15px; }
+  .name { font-weight: 560; font-size: 15px; line-height: 1.3; }
+  .meta { color: var(--muted); font-size: 12px; }
+  .spacer { flex: 1; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+  .tag {
+    font-size: 12px; padding: 2px 7px; border-radius: 20px;
+    border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .tag.drop { background: var(--down-bg); border-color: transparent; color: var(--down); font-weight: 600; }
+  .more { display: block; margin: 0 auto 50px; padding: 9px 20px; font: inherit; cursor: pointer;
+          background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+  .empty { max-width: 1400px; margin: 40px auto; padding: 0 18px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Locations à Bangkok</h1>
+  <div class="sub" id="sub"></div>
+</header>
+
+<div class="filters"><div class="in">
+  <label>Budget max <span class="val" id="vBudget"></span>
+    <input type="range" id="budget" min="5000" max="120000" step="1000"></label>
+  <label>Surface min <span class="val" id="vArea"></span>
+    <input type="range" id="area" min="0" max="200" step="5"></label>
+  <label>Chambres
+    <select id="beds"><option value="0">toutes</option><option value="1">1+</option>
+      <option value="2" selected>2+</option><option value="3">3+</option></select></label>
+  <label>Salles de bain
+    <select id="baths"><option value="0">toutes</option><option value="1">1+</option>
+      <option value="2" selected>2+</option></select></label>
+  <label>Quartier <select id="district"></select></label>
+  <label>Recherche <input type="search" id="q" placeholder="nom de résidence…"></label>
+  <label>Tri <select id="sort">
+      <option value="price">prix croissant</option>
+      <option value="-price">prix décroissant</option>
+      <option value="sqm">€ / m² croissant</option>
+      <option value="-area">surface décroissante</option>
+      <option value="-drop">plus fortes baisses</option>
+      <option value="-seen">vues le plus récemment</option>
+    </select></label>
+  <div class="checks">
+    <label><input type="checkbox" id="withPhoto"> avec photo</label>
+    <label><input type="checkbox" id="onlyDrop"> baisse de prix</label>
+  </div>
+</div></div>
+
+<div id="count"></div>
+<div class="grid" id="grid"></div>
+<button class="more" id="more" hidden>Afficher plus</button>
+<div class="empty" id="empty" hidden>Aucune annonce ne correspond à ces critères.</div>
+
+<script>
+const DATA = __DATA__;
+const META = __META__;
+const PAGE = 400;
+let shown = PAGE;
+
+const $ = id => document.getElementById(id);
+const nf = new Intl.NumberFormat('fr-FR');
+// Écart entre le premier et le dernier relevé : négatif = le loyer a baissé.
+const drop = l => l.prices ? l.prices.at(-1)[1] - l.prices[0][1] : 0;
+const perSqm = l => (l.area_sqm && l.price_eur) ? l.price_eur / l.area_sqm : Infinity;
+
+$('sub').textContent =
+  `${nf.format(META.total)} annonces · collectées du ${META.first} au ${META.last} · `
+  + `page générée le ${META.generated} · taux ${META.rate} THB/€`;
+
+const districts = [...new Set(DATA.map(l => l.district).filter(Boolean))].sort();
+$('district').innerHTML = '<option value="">tous</option>'
+  + districts.map(d => `<option>${d}</option>`).join('');
+
+$('budget').value = META.budget_max;
+$('area').value = 0;
+
+function filtered() {
+  const budget = +$('budget').value, area = +$('area').value;
+  const beds = +$('beds').value, baths = +$('baths').value;
+  const dist = $('district').value, q = $('q').value.trim().toLowerCase();
+  const photo = $('withPhoto').checked, dropOnly = $('onlyDrop').checked;
+
+  let out = DATA.filter(l =>
+    (l.price_thb ?? 0) <= budget
+    && (l.area_sqm ?? 0) >= area
+    && (l.bedrooms ?? 0) >= beds
+    && (l.bathrooms ?? 0) >= baths
+    && (!dist || l.district === dist)
+    && (!photo || l.photos)
+    && (!dropOnly || drop(l) < 0)
+    && (!q || (l.name || '').toLowerCase().includes(q) || (l.district || '').toLowerCase().includes(q))
+  );
+
+  const by = {
+    'price':  (a, b) => a.price_thb - b.price_thb,
+    '-price': (a, b) => b.price_thb - a.price_thb,
+    'sqm':    (a, b) => perSqm(a) - perSqm(b),
+    '-area':  (a, b) => (b.area_sqm ?? 0) - (a.area_sqm ?? 0),
+    '-drop':  (a, b) => drop(a) - drop(b),
+    '-seen':  (a, b) => (b.last_seen ?? '').localeCompare(a.last_seen ?? ''),
+  }[$('sort').value];
+  return out.sort(by);
+}
+
+function card(l) {
+  const d = drop(l);
+  const sqm = perSqm(l);
+  const tags = [
+    l.bedrooms ? `${l.bedrooms} ch` : '',
+    l.bathrooms ? `${l.bathrooms} sdb` : '',
+    l.area_sqm ? `${l.area_sqm} m²` : '',
+    l.floor ? `ét. ${l.floor}` : '',
+    isFinite(sqm) ? `${Math.round(sqm)} €/m²` : '',
+  ].filter(Boolean).map(t => `<span class="tag">${t}</span>`);
+  if (d < 0) tags.unshift(`<span class="tag drop">↓ ${nf.format(-d)} ฿ depuis le ${l.prices[0][0]}</span>`);
+
+  const img = l.photos
+    ? `<img class="ph" src="${l.photos}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+    : `<div class="ph none">pas de photo</div>`;
+
+  return `<a class="card" href="${l.url}" target="_blank" rel="noopener noreferrer">
+    ${img}
+    <div class="body">
+      <div class="price">${nf.format(l.price_thb)} ฿ <small>· ${nf.format(l.price_eur)} €/mois</small></div>
+      <div class="name">${l.name ?? 'Sans nom'}</div>
+      <div class="meta">${l.district ?? '—'} · ${l.source}</div>
+      <div class="spacer"></div>
+      <div class="tags">${tags.join('')}</div>
+    </div></a>`;
+}
+
+function render() {
+  const rows = filtered();
+  $('count').textContent = `${nf.format(rows.length)} annonce${rows.length > 1 ? 's' : ''}`;
+  $('grid').innerHTML = rows.slice(0, shown).map(card).join('');
+  $('more').hidden = rows.length <= shown;
+  $('empty').hidden = rows.length > 0;
+  $('vBudget').textContent = nf.format(+$('budget').value) + ' ฿';
+  $('vArea').textContent = $('area').value + ' m²';
+}
+
+document.querySelectorAll('.filters input, .filters select').forEach(el => {
+  el.addEventListener('input', () => { shown = PAGE; render(); });
+});
+$('more').addEventListener('click', () => { shown += PAGE; render(); });
+render();
+</script>
+</body>
+</html>
