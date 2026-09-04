@@ -130,6 +130,9 @@ const nf = new Intl.NumberFormat('fr-FR');
 // Écart entre le premier et le dernier relevé : négatif = le loyer a baissé.
 const drop = l => l.prices ? l.prices.at(-1)[1] - l.prices[0][1] : 0;
 const perSqm = l => (l.area_sqm && l.price_eur) ? l.price_eur / l.area_sqm : Infinity;
+// Une entree decrivant un batiment entier plutot qu'un logement : aucun des trois
+// criteres unitaires n'existe. C'est le cas de toute la source Renthub.
+const immeuble = l => l.bedrooms == null && l.area_sqm == null;
 
 // Médiane du €/m² par quartier, calculée une fois au chargement plutôt que servie dans
 // les données : 3600 valeurs dérivables coûtent moins cher à recalculer qu'à transporter.
@@ -174,12 +177,13 @@ function filtered() {
 
   let out = DATA.filter(l =>
     (l.price_eur ?? 0) <= budget
-    && (l.area_sqm ?? 0) >= area
-    // Renthub décrit des immeubles : ni chambres ni salles de bain à ce niveau. Ces
-    // entrées ne sont donc pas filtrables dessus — elles n'apparaissent que quand on
-    // demande explicitement le bail court, qu'elles seules renseignent.
-    && (l.bedrooms == null ? bailCourt : l.bedrooms >= beds)
-    && (l.bedrooms == null ? bailCourt : (l.bathrooms ?? 0) >= baths)
+    // Renthub décrit des immeubles, pas des logements : ni chambres, ni salles de bain,
+    // ni surface à ce niveau — ils sont sur la fiche, par type de chambre. Une entrée
+    // sans aucun des trois n'est filtrable sur aucun critère de logement, donc elle
+    // n'apparaît que quand on demande le bail court, qu'elle seule renseigne.
+    && (immeuble(l) ? bailCourt : (l.area_sqm ?? 0) >= area)
+    && (immeuble(l) ? bailCourt : l.bedrooms >= beds)
+    && (immeuble(l) ? bailCourt : (l.bathrooms ?? 0) >= baths)
     && (!bailCourt || l.min_lease_months)
     && (!dist || l.district === dist)
     && (!photo || l.photos)
