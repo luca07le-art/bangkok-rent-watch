@@ -18,6 +18,8 @@ deposit_max_months: 2
 # Immeuble « haut de gamme » : €/m² médian de l'immeuble >= ce multiple de la médiane du
 # quartier. Le marché paie le neuf et l'entretien ; 1.2 = 20 % plus cher au m² que le coin.
 standing_min: 1.2
+# Immeuble « récent » : achevé il y a au plus N ans (année lue par projects.py).
+recent_max_age_years: 8
 
 # Conversion
 eur_thb_rate: 38.3

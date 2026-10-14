@@ -71,7 +71,7 @@ CREATE INDEX IF NOT EXISTS idx_listings_segment ON listings(bedrooms, district);
 
 # Colonnes qu'un scraper a le droit de remplir. Tout le reste est calculé plus tard.
 FIELDS = (
-    "url project_name district address_raw lat lng nearest_station station_distance_m "
+    "url project_name project_name_norm district address_raw lat lng nearest_station station_distance_m "
     "price_thb price_eur bedrooms bathrooms area_sqm floor furnished min_lease_months "
     "deposit_months agent_name agent_contact title_raw description_raw lang photos"
 ).split()

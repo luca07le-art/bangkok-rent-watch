@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+import projects  # noqa: E402
 import store  # noqa: E402
 from scrapers import ddproperty, propertyhub, renthub  # noqa: E402
 
@@ -132,6 +133,23 @@ def test_report_build():
     assert all(len(r["prices"]) > 1 for r in data if "prices" in r)
     assert 0 <= with_photo <= len(data)
     print(f"report : {len(data)} annonces sérialisées, {round(len(html.encode()) / 1024)} Ko")
+
+
+def test_projects():
+    # Payload Next.js réel : la clé est échappée dans une chaîne JSON.
+    assert projects.parse_year(r'"ceilingHeight\":\"2.60\",\"completedYear\":\"2018\"') == 2018
+    assert projects.parse_year('"completedYear":"2018"') == 2018
+    assert projects.parse_year('"completedYear":"0000"') is None
+    assert projects.parse_year("page sans année") is None
+    facilities = r'\"facilities\":{\"pool\":true,\"sauna\":true,\"fitness\":false'
+    assert projects.parse_facility(facilities, "pool") == 1
+    assert projects.parse_facility(facilities, "fitness") == 0
+    assert projects.parse_facility("", "pool") is None  # 404 : inconnu, pas « sans piscine »
+    # Même règle que PropertyHub, vérifiée sur 598/616 slugs réels.
+    assert projects.slugify("Venio Sukhumvit 10") == "venio-sukhumvit-10"
+    assert projects.slugify("The Line Jatujak - Mochit") == "the-line-jatujak-mochit"
+    assert projects.key("  Park  Origin Ratchathewi ") == "park origin ratchathewi"
+    print("projects : année et slug corrects")
 
 
 if __name__ == "__main__":

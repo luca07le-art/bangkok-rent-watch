@@ -51,7 +51,7 @@ class Fetcher:
             self._robots[host] = rp
         return rp.can_fetch(self.ua, url)
 
-    def get(self, url: str) -> str:
+    def get(self, url: str, keep: bool = True) -> str:
         if not self.allowed(url):
             raise RobotsDenied(url)
 
@@ -76,7 +76,8 @@ class Fetcher:
                 backoff *= 3
                 continue
             r.raise_for_status()
-            cached.write_text(r.text, "utf-8")
+            if keep:
+                cached.write_text(r.text, "utf-8")
             return r.text
 
         raise RuntimeError(f"{url} : abandon après {self.retries} tentatives")

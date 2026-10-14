@@ -16,6 +16,8 @@ from pathlib import Path
 
 import yaml
 
+import projects
+
 ROOT = Path(__file__).parent
 
 # Les colonnes servies au navigateur. `min_lease_months` et `station_distance_m` ne sont
@@ -52,6 +54,19 @@ def build() -> tuple[str, dict, int]:
             rec["prices"] = prices
         listings.append(rec)
 
+    # Année, piscine, salle de sport par nom d'immeuble (projects.py) : la clé de nom est
+    # commune aux sources, c'est ce qui renseigne aussi les annonces DDproperty.
+    # Seuls les attributs connus sont envoyés : absent = inconnu, jamais « non ».
+    conn.executescript(projects.SCHEMA)
+    immeubles = {
+        k: {"year": y, "pool": p, "gym": f}
+        for k, y, p, f in conn.execute("SELECT name_key, completed_year, pool, fitness FROM projects")
+    }
+    for rec in listings:
+        for attr, v in immeubles.get(projects.key(rec.get("name") or ""), {}).items():
+            if v is not None:
+                rec[attr] = v
+
     span = conn.execute("SELECT MIN(first_seen), MAX(last_seen) FROM listings").fetchone()
     conn.close()
 
@@ -67,6 +82,7 @@ def build() -> tuple[str, dict, int]:
         "budget_max_eur": cfg["budget_max_eur"],
         "area_min": cfg["area_min_sqm"],
         "standing_min": cfg["standing_min"],
+        "recent_max_age": cfg["recent_max_age_years"],
     }
     html = (ROOT / "report.html").read_text("utf-8")
     for token, value in (("__DATA__", listings), ("__META__", meta)):

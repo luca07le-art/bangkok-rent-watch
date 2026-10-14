@@ -58,6 +58,8 @@ def parse(html: str) -> list[dict]:
                 "url": LISTING + item["slug"],
                 "title_raw": item.get("title"),
                 "project_name": project.get("nameEnglish") or project.get("name"),
+                # Slug fourni par la source : c'est aussi l'adresse de la page projet (projects.py).
+                "project_name_norm": project.get("slug"),
                 "address_raw": project.get("address"),
                 "district": district,
                 "price_thb": monthly.get("price"),

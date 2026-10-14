@@ -5,6 +5,7 @@ cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 
 py -u main.py       >> data\crawl.log 2>&1
+py -u projects.py   >> data\crawl.log 2>&1
 py -u report.py     >> data\crawl.log 2>&1
 
 git add index.html
