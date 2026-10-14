@@ -72,6 +72,7 @@
   }
   .tag.drop { background: var(--down-bg); border-color: transparent; color: var(--down); font-weight: 600; }
   .tag.deal { border-color: var(--down); color: var(--down); font-weight: 600; }
+  .tag.haut { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .tag.bail { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
   .more { display: block; margin: 0 auto 50px; padding: 9px 20px; font: inherit; cursor: pointer;
           background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
@@ -100,6 +101,7 @@
   <label>Recherche <input type="search" id="q" placeholder="nom de résidence…"></label>
   <label>Tri <select id="sort">
       <option value="affaire">meilleure affaire</option>
+      <option value="-standing">standing de l'immeuble</option>
       <option value="price">prix croissant</option>
       <option value="-price">prix décroissant</option>
       <option value="sqm">€ / m² croissant</option>
@@ -111,6 +113,7 @@
     <label><input type="checkbox" id="withPhoto" checked> avec photo</label>
     <label><input type="checkbox" id="onlyDrop"> baisse de prix</label>
     <label><input type="checkbox" id="bailCourt"> bail court</label>
+    <label><input type="checkbox" id="haut"> immeuble haut de gamme</label>
   </div>
 </div></div>
 
@@ -157,6 +160,30 @@ const affaire = l => {
   return (m && isFinite(v)) ? v / m : Infinity;
 };
 
+// Standing d'un immeuble : son €/m² médian rapporté à celui de son quartier. Le marché paie
+// le neuf, l'entretien et les équipements — 1,3 = immeuble 30 % plus cher au m² que le coin.
+// Calculé sur toutes les annonces de l'immeuble, quelle que soit leur taille, et seulement
+// à partir de 3 : en dessous c'est le prix d'un logement, pas celui d'un immeuble.
+// ponytail: les petites surfaces sont plus chères au m², un immeuble de studios ressort donc
+// un peu flatté. Corriger par surface si le classement s'en trouve faussé à l'usage.
+const immKey = l => `${l.district}|${(l.name || '').trim().toLowerCase()}`;
+const STANDING = (() => {
+  const par = {}, out = {};
+  for (const l of DATA) {
+    const v = perSqm(l);
+    if (isFinite(v) && l.name && l.district) (par[immKey(l)] ??= []).push(v);
+  }
+  for (const [k, vs] of Object.entries(par)) {
+    const m = MEDIANES[k.split('|')[0]];
+    if (vs.length < 3 || !m) continue;
+    vs.sort((a, b) => a - b);
+    out[k] = vs[Math.floor(vs.length / 2)] / m;
+  }
+  return out;
+})();
+const standing = l => STANDING[immKey(l)] ?? 0;
+const HAUT = META.standing_min;
+
 $('sub').textContent =
   `${nf.format(META.total)} annonces · collectées du ${META.first} au ${META.last} · `
   + `page générée le ${META.generated} · taux ${META.rate} THB/€`;
@@ -173,7 +200,7 @@ function filtered() {
   const beds = +$('beds').value, baths = +$('baths').value;
   const dist = $('district').value, q = $('q').value.trim().toLowerCase();
   const photo = $('withPhoto').checked, dropOnly = $('onlyDrop').checked;
-  const bailCourt = $('bailCourt').checked;
+  const bailCourt = $('bailCourt').checked, haut = $('haut').checked;
 
   let out = DATA.filter(l =>
     (l.price_eur ?? 0) <= budget
@@ -188,11 +215,13 @@ function filtered() {
     && (!dist || l.district === dist)
     && (!photo || l.photos)
     && (!dropOnly || drop(l) < 0)
+    && (!haut || standing(l) >= HAUT)
     && (!q || (l.name || '').toLowerCase().includes(q) || (l.district || '').toLowerCase().includes(q))
   );
 
   const by = {
     'affaire': (a, b) => affaire(a) - affaire(b),
+    '-standing': (a, b) => standing(b) - standing(a),
     'price':  (a, b) => a.price_thb - b.price_thb,
     '-price': (a, b) => b.price_thb - a.price_thb,
     'sqm':    (a, b) => perSqm(a) - perSqm(b),
@@ -221,6 +250,8 @@ function card(l) {
     const pct = Math.round((a - 1) * 100);
     tags.unshift(`<span class="tag${pct < 0 ? ' deal' : ''}">${pct > 0 ? '+' : ''}${pct} % / ${l.district}</span>`);
   }
+  const s = standing(l);
+  if (s >= HAUT) tags.unshift(`<span class="tag haut">immeuble +${Math.round((s - 1) * 100)} % / quartier</span>`);
   // Le bail court est l'information la plus rare du projet : elle passe devant tout.
   if (l.min_lease_months) tags.unshift(`<span class="tag bail">bail ${l.min_lease_months} mois</span>`);
   if (d < 0) tags.unshift(`<span class="tag drop">↓ ${nf.format(-d)} ฿ depuis le ${l.prices[0][0]}</span>`);

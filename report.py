@@ -66,6 +66,7 @@ def build() -> tuple[str, dict, int]:
         # et `rate` sert à afficher l'équivalent en bahts sous le curseur.
         "budget_max_eur": cfg["budget_max_eur"],
         "area_min": cfg["area_min_sqm"],
+        "standing_min": cfg["standing_min"],
     }
     html = (ROOT / "report.html").read_text("utf-8")
     for token, value in (("__DATA__", listings), ("__META__", meta)):
