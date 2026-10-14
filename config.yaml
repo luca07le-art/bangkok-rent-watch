@@ -5,7 +5,7 @@ bedrooms_min: 2
 bathrooms_min: 2
 # Le budget se raisonne en euros : c'est la devise du locataire, pas celle du marché.
 # Les loyers thaïs sont convertis via eur_thb_rate. C'est le loyer TOTAL du logement,
-# pas la part par personne : 1 400 €/mois = 51 800 THB au taux du 2026-09-01, pour deux.
+# pas la part par personne : 1 400 €/mois = 53 620 THB au taux du 2026-10-14, pour deux.
 # Les annonces au-dessus restent collectées et stockées : les médianes par quartier doivent
 # porter sur tout le segment, pas sur le seul budget, sinon elles ne comparent plus rien.
 budget_max_eur: 1400
@@ -17,8 +17,8 @@ station_max_m: 800
 deposit_max_months: 2
 
 # Conversion
-eur_thb_rate: 37.0
-eur_thb_rate_updated: 2026-09-01
+eur_thb_rate: 38.3
+eur_thb_rate_updated: 2026-10-14
 
 # Séjour visé
 target_move_in: 2027-04-25
