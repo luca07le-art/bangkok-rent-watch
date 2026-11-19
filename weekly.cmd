@@ -8,6 +8,7 @@ py -u main.py       >> data\crawl.log 2>&1
 py -u projects.py   >> data\crawl.log 2>&1
 py -u details.py    >> data\crawl.log 2>&1
 py -u rooms.py      >> data\crawl.log 2>&1
+py -u gone.py       >> data\crawl.log 2>&1
 py -u report.py     >> data\crawl.log 2>&1
 
 git add index.html

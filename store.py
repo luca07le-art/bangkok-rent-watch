@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS listings (
     score               REAL,
     scraped_at          TIMESTAMP,
     reappeared_on       DATE,              -- revue après une absence de plus d'une passe
+    gone_on             DATE,              -- fiche disparue : louée ou retirée (gone.py)
     UNIQUE (source, source_id)
 );
 
@@ -87,9 +88,11 @@ def connect(path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
-    # Colonne ajoutée le 2026-11-19 : les bases créées avant ne l'ont pas.
-    if "reappeared_on" not in {r[1] for r in conn.execute("PRAGMA table_info(listings)")}:
-        conn.execute("ALTER TABLE listings ADD COLUMN reappeared_on DATE")
+    # Colonnes ajoutées le 2026-11-19 : les bases créées avant ne les ont pas.
+    have = {r[1] for r in conn.execute("PRAGMA table_info(listings)")}
+    for col in ("reappeared_on", "gone_on"):
+        if col not in have:
+            conn.execute(f"ALTER TABLE listings ADD COLUMN {col} DATE")
     return conn
 
 
@@ -102,7 +105,7 @@ def upsert(conn: sqlite3.Connection, source: str, rec: dict) -> str:
     now, today = datetime.now().isoformat(timespec="seconds"), date.today().isoformat()
     sid = str(rec["source_id"])
     row = conn.execute(
-        "SELECT id, price_thb, last_seen FROM listings WHERE source = ? AND source_id = ?", (source, sid)
+        "SELECT id, price_thb, last_seen, gone_on FROM listings WHERE source = ? AND source_id = ?", (source, sid)
     ).fetchone()
 
     values = {k: rec.get(k) for k in FIELDS}
@@ -119,11 +122,13 @@ def upsert(conn: sqlite3.Connection, source: str, rec: dict) -> str:
         # COALESCE : la page liste ne sert pas tout (description, station…). Un champ absent
         # ne doit pas effacer ce que details.py a lu sur la fiche.
         assignments = ", ".join(f"{k} = COALESCE(?, {k})" for k in FIELDS)
-        # Absente plus d'une passe puis revue : c'est l'alerte des favoris du rapport.
-        back = bool(row["last_seen"]) and (date.today() - date.fromisoformat(row["last_seen"])).days > REAPPEAR_DAYS
+        # Absente plus d'une passe, ou fiche disparue, puis revue : c'est l'alerte des favoris.
+        # Revue = de nouveau disponible, donc gone_on s'efface.
+        back = bool(row["gone_on"]) or (
+            bool(row["last_seen"]) and (date.today() - date.fromisoformat(row["last_seen"])).days > REAPPEAR_DAYS)
         conn.execute(
             f"UPDATE listings SET {assignments}, last_seen = ?, scraped_at = ?, is_active = 1, "
-            "reappeared_on = CASE WHEN ? THEN ? ELSE reappeared_on END WHERE id = ?",
+            "reappeared_on = CASE WHEN ? THEN ? ELSE reappeared_on END, gone_on = NULL WHERE id = ?",
             [*values.values(), today, now, back, today, listing_id],
         )
         outcome = "price" if row["price_thb"] != rec.get("price_thb") else "seen"

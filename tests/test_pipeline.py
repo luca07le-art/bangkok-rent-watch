@@ -127,6 +127,12 @@ def test_store_idempotent():
     conn.execute("UPDATE listings SET last_seen = '2026-01-01' WHERE source = 'ddproperty'")
     store.upsert(conn, "ddproperty", {**rec, "price_thb": 38000})
     assert conn.execute(reappeared).fetchone()[0] == store.date.today().isoformat()
+
+    # Louée puis revue dans un crawl : de nouveau disponible, et c'est une réapparition.
+    conn.execute("UPDATE listings SET gone_on = '2026-02-01', reappeared_on = NULL WHERE source = 'ddproperty'")
+    store.upsert(conn, "ddproperty", {**rec, "price_thb": 38000})
+    assert tuple(conn.execute("SELECT gone_on, reappeared_on FROM listings WHERE source = 'ddproperty'"
+                              ).fetchone()) == (None, store.date.today().isoformat())
     print("store : upsert idempotent, historique de prix correct")
 
 
@@ -149,7 +155,17 @@ def test_rooms():
     assert (three["price_thb"], three["min_lease_months"], three["district"]) == (70000, None, "Khlong Toei")
     assert two["source_id"] == "51337-TWO_BED_ROOM-75" and two["deposit_months"] == 1
     assert rooms.parse("", {}) == []
-    print("rooms : types 2 ch+ et palier 3 mois lus")
+
+    # Le 3 chambres n'est plus sur la fiche de la résidence : loué. Le 2 chambres reste disponible.
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(store.SCHEMA)
+    for r in (two, three):
+        store.upsert(conn, rooms.SOURCE, r)
+    assert rooms.mark_gone(conn, "https://r/aspira", {two["source_id"]}) == 1
+    gone = dict(conn.execute("SELECT source_id, gone_on FROM listings").fetchall())
+    assert gone[two["source_id"]] is None and gone[three["source_id"]] == store.date.today().isoformat()
+    print("rooms : types 2 ch+ et palier 3 mois lus, type disparu marqué loué")
 
 
 def test_report_build():

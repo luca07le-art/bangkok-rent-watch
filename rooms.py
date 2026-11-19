@@ -66,6 +66,15 @@ def parse(html: str, building: dict) -> list[dict]:
     return out
 
 
+def mark_gone(conn, url: str, present: set[str]) -> int:
+    """Un type de logement absent de la fiche de sa résidence : plus proposé, loué ou retiré."""
+    ids = [r[0] for r in conn.execute(
+        "SELECT id, source_id FROM listings WHERE source = ? AND url = ? AND gone_on IS NULL", (SOURCE, url)
+    ) if r[1] not in present]
+    conn.executemany("UPDATE listings SET gone_on = ? WHERE id = ?", [(date.today().isoformat(), i) for i in ids])
+    return len(ids)
+
+
 def todo(conn, cfg: dict) -> list[dict]:
     s = cfg["sources"]["renthub"]
     since = (date.today() - timedelta(days=21)).isoformat()
@@ -91,23 +100,27 @@ def main() -> int:
     pending = todo(conn, cfg)
     print(f"\n=== résidences Renthub : {len(pending)} fiches à lire")
     tally: dict[str, int] = {}
+    gone = 0
     for building in pending:
         try:
             recs = parse(fetcher.get(building["url"], keep=False), building)
         except RobotsDenied:
             print("  robots.txt interdit les fiches — arrêt")
             break
-        except requests.HTTPError:
-            continue  # résidence retirée
+        except requests.HTTPError as exc:
+            if exc.response is None or exc.response.status_code not in (404, 410):
+                continue  # erreur passagère : rien ne prouve que la résidence a disparu
+            recs = []  # résidence retirée : tous ses logements le sont
         except Exception as exc:
             print(f"  échec {building['url']} : {exc}")
             continue
+        gone += mark_gone(conn, building["url"], {r["source_id"] for r in recs})
         for rec in recs:
             rec["price_eur"] = round(rec["price_thb"] / cfg["eur_thb_rate"])
             outcome = store.upsert(conn, SOURCE, rec)
             tally[outcome] = tally.get(outcome, 0) + 1
         conn.commit()
-    print(f"logements 2 ch+ : {tally}")
+    print(f"logements 2 ch+ : {tally}, {gone} disparus de leur résidence")
     conn.close()
     return 0
 

@@ -12,7 +12,7 @@ Bail court = PropertyHub publie un prix par palier (`monthly1/3/6`) quand le bai
 from __future__ import annotations
 
 import json
-import sqlite3
+
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -20,6 +20,7 @@ from pathlib import Path
 import requests
 import yaml
 
+import store
 from fetch import Fetcher, RobotsDenied
 from scrapers.propertyhub import NEXT_DATA
 
@@ -59,7 +60,7 @@ def todo(conn, cfg: dict) -> list[tuple[int, str]]:
 def main() -> int:
     cfg = yaml.safe_load((ROOT / "config.yaml").read_text("utf-8"))
     fetcher = Fetcher(cfg, ROOT / "data" / "cache")
-    conn = sqlite3.connect(ROOT / "data" / "listings.db")
+    conn = store.connect(ROOT / "data" / "listings.db")  # crée gone_on sur les bases anciennes
     pending = todo(conn, cfg)
     print(f"\n=== fiches PropertyHub : {len(pending)} à lire")
     short = gone = 0
@@ -69,14 +70,17 @@ def main() -> int:
         except RobotsDenied:
             print("  robots.txt interdit les fiches — arrêt")
             break
-        except requests.HTTPError:
+        except requests.HTTPError as exc:
+            if exc.response is None or exc.response.status_code not in (404, 410):
+                continue  # erreur passagère : retentée la semaine suivante
             d = None
         except Exception as exc:  # réseau : retentée la semaine suivante
             print(f"  échec {url} : {exc}")
             continue
         if d is None:
             gone += 1
-            d = {"description_raw": ""}  # marquée lue, pour ne pas la redemander chaque semaine
+            # Marquée lue pour ne pas la redemander, et disparue : c'est « loué » dans le rapport.
+            d = {"description_raw": "", "gone_on": date.today().isoformat()}
         conn.execute(
             f"UPDATE listings SET {', '.join(f'{k} = ?' for k in d)} WHERE id = ?", [*d.values(), lid]
         )

@@ -237,6 +237,7 @@
     display: grid; place-items: center; background: rgba(0,0,0,.45); color: #fff;
   }
   .fav[aria-pressed="true"] svg { fill: #ffc94d; stroke: #ffc94d; }
+  .tag.gone { background: var(--ink); border-color: transparent; color: var(--bg); font-weight: 600; }
   .tag.alert { background: var(--down); border-color: transparent; color: var(--card); font-weight: 600; }
   .alert {
     display: flex; align-items: center; gap: 8px; margin: 12px var(--gutter) 0; padding: 8px 8px 8px 14px;
@@ -516,6 +517,8 @@ function filtered() {
     // Fiches immeuble Renthub : ni chambres ni surface. Leurs logements 2 ch+ sont déjà
     // des annonces à part entière (rooms.py, source renthub-room) ; le reste, des studios.
     && !immeuble(l)
+    // Louée (fiche disparue, gone.py) : ne reste visible que dans les favoris.
+    && !l.gone_on
     && (l.area_sqm ?? 0) >= area && l.bedrooms >= beds
     // Salles de bain inconnues (résidences Renthub, qui ne les donnent pas) : pas un motif d'exclusion.
     && (l.bathrooms ?? baths) >= baths
@@ -563,6 +566,7 @@ function card(l) {
   ].filter(Boolean).map(esc).join(' · ');
 
   const tags = [];
+  if (l.gone_on) tags.push(`<span class="tag gone">louée · fiche retirée le ${esc(l.gone_on)}</span>`);
   if (alerts.has(l.url)) tags.push(`<span class="tag alert">★ ${esc(alerts.get(l.url))}</span>`);
   if (mode === 'favs') tags.push(`<span class="tag">vue le ${esc(l.last_seen)}</span>`);
   if (d < 0) tags.push(`<span class="tag drop">↓ ${nf.format(-d)} ฿ depuis le ${esc(l.prices[0][0])}</span>`);
@@ -613,15 +617,17 @@ const twin = (f, l) => l.url !== f.url && immKey(l) === f.imm && l.bedrooms === 
   && Math.abs((l.area_sqm ?? -99) - f.area) <= 2 && (f.floor == null || l.floor == null || l.floor === f.floor);
 
 // Alerte = depuis le dernier « Vu » (f.ack, une date de passe) : le favori est revenu après au
-// moins une passe d'absence (reappeared_on, calculé par store.py), ou un jumeau est apparu.
+// moins une passe d'absence (reappeared_on, calculé par store.py), a été loué (gone_on, gone.py),
+// ou un jumeau est apparu.
 let alerts = new Map();
 function computeAlerts() {
   alerts = new Map();
   for (const f of Object.values(favs)) {
     const l = BY_URL.get(f.url);
     if (l?.reappeared_on > f.ack) alerts.set(f.url, `réapparue le ${l.reappeared_on}`);
+    else if (l?.gone_on > f.ack) alerts.set(f.url, 'louée');
     if (f.area == null) continue;
-    for (const x of DATA) if (x.first_seen > f.ack && twin(f, x)) alerts.set(x.url, 'nouvelle, semblable à un favori');
+    for (const x of DATA) if (x.first_seen > f.ack && !x.gone_on && twin(f, x)) alerts.set(x.url, 'nouvelle, semblable à un favori');
   }
 }
 

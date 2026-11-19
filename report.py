@@ -26,7 +26,7 @@ ROOT = Path(__file__).parent
 QUERY = """
 SELECT l.id, l.url, l.source, l.district, l.first_seen, l.last_seen,
        l.price_thb, l.price_eur, l.bedrooms, l.bathrooms, l.area_sqm, l.floor, l.photos,
-       l.min_lease_months, l.nearest_station, l.station_distance_m, l.reappeared_on,
+       l.min_lease_months, l.nearest_station, l.station_distance_m, l.reappeared_on, l.gone_on,
        COALESCE(l.project_name, l.title_raw) AS name
 FROM listings l
 WHERE l.price_thb IS NOT NULL
