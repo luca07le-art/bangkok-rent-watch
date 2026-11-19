@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+import details  # noqa: E402
 import projects  # noqa: E402
 import store  # noqa: E402
 from scrapers import ddproperty, propertyhub, renthub  # noqa: E402
@@ -113,6 +114,11 @@ def test_store_idempotent():
     # Même source_id chez une autre source = une autre annonce.
     assert store.upsert(conn, "propertyhub", rec) == "new"
     assert conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0] == 2
+    # Ce que details.py lit sur la fiche survit au crawl suivant, dont la page liste l'ignore.
+    conn.execute("UPDATE listings SET description_raw = 'meublé', min_lease_months = 3")
+    store.upsert(conn, "ddproperty", {**rec, "price_thb": 38000})
+    assert tuple(conn.execute("SELECT description_raw, min_lease_months FROM listings WHERE source = 'ddproperty'"
+                        ).fetchone()) == ("meublé", 3)
     print("store : upsert idempotent, historique de prix correct")
 
 
@@ -150,6 +156,25 @@ def test_projects():
     assert projects.slugify("The Line Jatujak - Mochit") == "the-line-jatujak-mochit"
     assert projects.key("  Park  Origin Ratchathewi ") == "park origin ratchathewi"
     print("projects : année et slug corrects")
+
+
+def test_details():
+    # Forme réelle de la fiche du 2026-11-19, réduite aux champs lus.
+    page = {"props": {"pageProps": {"listing": {
+        "detail": "<p>Fully furnished</p>",
+        "price": {"forRent": {"monthly": {"price": 40000}, "monthly1": None,
+                              "monthly3": {"price": 45000}, "monthly6": {"price": 42000},
+                              "deposit": {"type": "MONTH", "month": 2}}},
+        "nearbyZones": {"MASS_TRANSIT": [{"name": "MRT Phra Ram 9", "distance": 319}]},
+    }}}}
+    html = f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(page)}</script>'
+    assert details.parse(html) == {
+        "description_raw": "<p>Fully furnished</p>", "min_lease_months": 3, "deposit_months": 2,
+        "nearest_station": "MRT Phra Ram 9", "station_distance_m": 319,
+    }
+    retired = '<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{}}}</script>'
+    assert details.parse(retired) is None and details.parse("") is None
+    print("details : bail court, caution, station lus")
 
 
 if __name__ == "__main__":

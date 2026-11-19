@@ -56,6 +56,9 @@ sources:
     # pas par `?page=2` qui est ignoré. La zone `bangkok` compte 2413 pages à elle seule,
     # donc ce plafond est un budget de temps. 20 zones x 5 pages = 100 requêtes, ~6 min.
     max_pages_per_zone: 5
+    # details.py : fiches lues par passe (~3,5 s chacune). 800 ~ 47 min, sous la limite de 3 h
+    # de la tache planifiee ; le stock (~1500 annonces dans le budget) se vide en 2 semaines.
+    details_max_per_run: 800
     zones:
       - bangkok
       - bts-asok

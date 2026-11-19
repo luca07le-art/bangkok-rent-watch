@@ -108,7 +108,9 @@ def upsert(conn: sqlite3.Connection, source: str, rec: dict) -> str:
         listing_id, outcome = conn.execute("SELECT last_insert_rowid()").fetchone()[0], "new"
     else:
         listing_id = row["id"]
-        assignments = ", ".join(f"{k} = ?" for k in FIELDS)
+        # COALESCE : la page liste ne sert pas tout (description, station…). Un champ absent
+        # ne doit pas effacer ce que details.py a lu sur la fiche.
+        assignments = ", ".join(f"{k} = COALESCE(?, {k})" for k in FIELDS)
         conn.execute(
             f"UPDATE listings SET {assignments}, last_seen = ?, scraped_at = ?, is_active = 1 "
             "WHERE id = ?",

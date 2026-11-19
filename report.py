@@ -20,10 +20,9 @@ import projects
 
 ROOT = Path(__file__).parent
 
-# Les colonnes servies au navigateur. `min_lease_months` et `station_distance_m` ne sont
-# remplies que par Renthub : nulles ailleurs, et c'est justement ce qui les rend utiles.
-# Restent à 0 % — donc absentes d'ici — lat/lng, meublé, dépôt, agent et description :
-# elles n'existent que sur les fiches annonces, une requête par annonce (phase 2).
+# Les colonnes servies au navigateur. `min_lease_months` et `station_distance_m` viennent de
+# Renthub et, pour PropertyHub, de la fiche annonce (details.py, segment dans le budget).
+# La description reste en base, pas ici : 1 à 3 Ko par annonce gonflerait index.html.
 QUERY = """
 SELECT l.id, l.url, l.source, l.district, l.first_seen, l.last_seen,
        l.price_thb, l.price_eur, l.bedrooms, l.bathrooms, l.area_sqm, l.floor, l.photos,
