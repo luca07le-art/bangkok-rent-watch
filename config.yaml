@@ -103,5 +103,19 @@ sources:
       - mrt-huai-khwang
       - mrt-lat-phrao
       - mrt-phra-ram-9
+      # Ajoutées le 2026-11-19 pour les résidences (rooms.py) : Silom, Sathon, Ratchathewi, Ari.
+      - bts-chong-nonsi
+      - bts-sala-daeng
+      - bts-surasak
+      - bts-chit-lom
+      - bts-ratchathewi
+      - bts-phaya-thai
+      - bts-ari
+      - mrt-lumphini
+      - mrt-sam-yan
+    # rooms.py : fiche des résidences dont le haut de fourchette atteint ce loyer (en deçà, pas
+    # de 2 chambres), au plus N par passe (~3,5 s chacune).
+    rooms_min_price_thb: 25000
+    rooms_max_per_run: 400
   hipflat:
     enabled: false           # Cloudflare, 403 jusque sur robots.txt — abandonnée

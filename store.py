@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS listings (
     dedup_group_id      INTEGER REFERENCES dedup_groups(id),
     score               REAL,
     scraped_at          TIMESTAMP,
+    reappeared_on       DATE,              -- revue après une absence de plus d'une passe
     UNIQUE (source, source_id)
 );
 
@@ -69,6 +70,10 @@ CREATE INDEX IF NOT EXISTS idx_price_history_listing ON price_history(listing_id
 CREATE INDEX IF NOT EXISTS idx_listings_segment ON listings(bedrooms, district);
 """
 
+# Passes hebdomadaires : au-delà de 10 jours sans être vue, l'annonce a manqué au moins une passe.
+# ponytail: à baisser à 2 jours avec le crawl quotidien de la phase 2.
+REAPPEAR_DAYS = 10
+
 # Colonnes qu'un scraper a le droit de remplir. Tout le reste est calculé plus tard.
 FIELDS = (
     "url project_name project_name_norm district address_raw lat lng nearest_station station_distance_m "
@@ -82,6 +87,9 @@ def connect(path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    # Colonne ajoutée le 2026-11-19 : les bases créées avant ne l'ont pas.
+    if "reappeared_on" not in {r[1] for r in conn.execute("PRAGMA table_info(listings)")}:
+        conn.execute("ALTER TABLE listings ADD COLUMN reappeared_on DATE")
     return conn
 
 
@@ -94,7 +102,7 @@ def upsert(conn: sqlite3.Connection, source: str, rec: dict) -> str:
     now, today = datetime.now().isoformat(timespec="seconds"), date.today().isoformat()
     sid = str(rec["source_id"])
     row = conn.execute(
-        "SELECT id, price_thb FROM listings WHERE source = ? AND source_id = ?", (source, sid)
+        "SELECT id, price_thb, last_seen FROM listings WHERE source = ? AND source_id = ?", (source, sid)
     ).fetchone()
 
     values = {k: rec.get(k) for k in FIELDS}
@@ -111,10 +119,12 @@ def upsert(conn: sqlite3.Connection, source: str, rec: dict) -> str:
         # COALESCE : la page liste ne sert pas tout (description, station…). Un champ absent
         # ne doit pas effacer ce que details.py a lu sur la fiche.
         assignments = ", ".join(f"{k} = COALESCE(?, {k})" for k in FIELDS)
+        # Absente plus d'une passe puis revue : c'est l'alerte des favoris du rapport.
+        back = bool(row["last_seen"]) and (date.today() - date.fromisoformat(row["last_seen"])).days > REAPPEAR_DAYS
         conn.execute(
-            f"UPDATE listings SET {assignments}, last_seen = ?, scraped_at = ?, is_active = 1 "
-            "WHERE id = ?",
-            [*values.values(), today, now, listing_id],
+            f"UPDATE listings SET {assignments}, last_seen = ?, scraped_at = ?, is_active = 1, "
+            "reappeared_on = CASE WHEN ? THEN ? ELSE reappeared_on END WHERE id = ?",
+            [*values.values(), today, now, back, today, listing_id],
         )
         outcome = "price" if row["price_thb"] != rec.get("price_thb") else "seen"
 

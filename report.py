@@ -9,7 +9,6 @@ et le gabarit reste un vrai fichier .html éditable.
 from __future__ import annotations
 
 import json
-import sqlite3
 import sys
 from datetime import date
 from pathlib import Path
@@ -17,6 +16,7 @@ from pathlib import Path
 import yaml
 
 import projects
+import store
 
 ROOT = Path(__file__).parent
 
@@ -26,7 +26,7 @@ ROOT = Path(__file__).parent
 QUERY = """
 SELECT l.id, l.url, l.source, l.district, l.first_seen, l.last_seen,
        l.price_thb, l.price_eur, l.bedrooms, l.bathrooms, l.area_sqm, l.floor, l.photos,
-       l.min_lease_months, l.nearest_station, l.station_distance_m,
+       l.min_lease_months, l.nearest_station, l.station_distance_m, l.reappeared_on,
        COALESCE(l.project_name, l.title_raw) AS name
 FROM listings l
 WHERE l.price_thb IS NOT NULL
@@ -35,8 +35,7 @@ WHERE l.price_thb IS NOT NULL
 
 def build() -> tuple[str, dict, int]:
     cfg = yaml.safe_load((ROOT / "config.yaml").read_text("utf-8"))
-    conn = sqlite3.connect(ROOT / "data" / "listings.db")
-    conn.row_factory = sqlite3.Row
+    conn = store.connect(ROOT / "data" / "listings.db")  # ajoute reappeared_on aux bases anciennes
 
     # Un seul balayage de l'historique plutôt qu'une requête par annonce.
     history: dict[int, list] = {}

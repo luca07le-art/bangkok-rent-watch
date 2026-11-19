@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 import details  # noqa: E402
 import projects  # noqa: E402
+import rooms  # noqa: E402
 import store  # noqa: E402
 from scrapers import ddproperty, propertyhub, renthub  # noqa: E402
 
@@ -119,7 +120,36 @@ def test_store_idempotent():
     store.upsert(conn, "ddproperty", {**rec, "price_thb": 38000})
     assert tuple(conn.execute("SELECT description_raw, min_lease_months FROM listings WHERE source = 'ddproperty'"
                         ).fetchone()) == ("meublé", 3)
+
+    # Revue après plus d'une passe d'absence : c'est l'alerte des favoris. Pas avant.
+    reappeared = "SELECT reappeared_on FROM listings WHERE source = 'ddproperty'"
+    assert conn.execute(reappeared).fetchone()[0] is None
+    conn.execute("UPDATE listings SET last_seen = '2026-01-01' WHERE source = 'ddproperty'")
+    store.upsert(conn, "ddproperty", {**rec, "price_thb": 38000})
+    assert conn.execute(reappeared).fetchone()[0] == store.date.today().isoformat()
     print("store : upsert idempotent, historique de prix correct")
+
+
+def test_rooms():
+    page = {"props": {"pageProps": {"listing": {
+        "id": 51337, "name": "Aspira Parc", "description": "<p>Housekeeping</p>", "coverPicture": "/a.jpg",
+        "fee": {"deposit": {"type": "MONTH", "month": 1}},
+        "rooms": [
+            {"roomType": "STUDIO", "minSize": 20, "price": {"monthly": {"minPrice": 35000}}},
+            {"roomType": "TWO_BED_ROOM", "minSize": 75, "price": {
+                "monthly": {"minPrice": 48000},
+                "shortTerm": {"oneMonth": 55000, "threeMonth": 50000, "sixMonth": None}}},
+            {"roomType": "THREE_BED_ROOM", "minSize": 110, "price": {"monthly": {"minPrice": 70000}}},
+        ],
+    }}}}
+    html = f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(page)}</script>'
+    two, three = rooms.parse(html, {"url": "https://r/aspira", "district": "Khlong Toei"})
+    # Le loyer d'un séjour de 4 mois : le palier 3 mois, pas le bail long.
+    assert (two["bedrooms"], two["area_sqm"], two["price_thb"], two["min_lease_months"]) == (2, 75, 50000, 1)
+    assert (three["price_thb"], three["min_lease_months"], three["district"]) == (70000, None, "Khlong Toei")
+    assert two["source_id"] == "51337-TWO_BED_ROOM-75" and two["deposit_months"] == 1
+    assert rooms.parse("", {}) == []
+    print("rooms : types 2 ch+ et palier 3 mois lus")
 
 
 def test_report_build():

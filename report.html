@@ -220,6 +220,35 @@
   .empty { text-align: center; padding: 48px 12px; color: var(--muted); }
   .empty p { margin: 0 0 16px; }
 
+  /* ---- Favoris ---- */
+  .tabs { display: flex; gap: 6px; margin-top: 10px; }
+  .tab {
+    flex: 1; height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: 10px; border: 1px solid var(--line); background: var(--card); font-weight: 560; font-size: 15px;
+  }
+  .tab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  /* Les favoris s'affichent tous, quels que soient les filtres : leurs commandes n'y servent à rien. */
+  body.favs .chips, body.favs .sort { display: none; }
+  body.favs .bar { padding-bottom: 12px; }
+  .cardw { position: relative; display: flex; }
+  .cardw > .card { flex: 1; min-width: 0; }
+  .fav {
+    position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; border-radius: 22px;
+    display: grid; place-items: center; background: rgba(0,0,0,.45); color: #fff;
+  }
+  .fav[aria-pressed="true"] svg { fill: #ffc94d; stroke: #ffc94d; }
+  .tag.alert { background: var(--down); border-color: transparent; color: var(--card); font-weight: 600; }
+  .alert {
+    display: flex; align-items: center; gap: 8px; margin: 12px var(--gutter) 0; padding: 8px 8px 8px 14px;
+    border-radius: 12px; background: var(--down-bg); color: var(--down); font-size: 15px; font-weight: 600;
+  }
+  .alert[hidden], .alert button[hidden] { display: none; }
+  .alert span { flex: 1; }
+  .alert button {
+    height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); font-weight: 600; font-size: 14px;
+  }
+
   /* ---- Grand écran : la feuille devient une colonne fixe ---- */
   @media (min-width: 960px) {
     :root { --gutter: 28px; }
@@ -240,6 +269,7 @@
     .chips { display: none; }
     .pair { grid-template-columns: 1fr; }
     .meta-row { padding-top: 16px; }
+    .alert { margin: 16px 0 0; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -332,6 +362,10 @@
           Filtres <span class="badge" id="nActive" hidden></span>
         </button>
       </div>
+      <div class="tabs" role="tablist" aria-label="Vue">
+        <button class="tab" role="tab" id="tabAll" aria-selected="true">Annonces</button>
+        <button class="tab" role="tab" id="tabFav" aria-selected="false">Favoris <span class="badge" id="nFav" hidden></span></button>
+      </div>
       <div class="chips" role="group" aria-label="Filtres rapides">
         <label class="chip"><input type="checkbox" data-f="haut"><span>Haut de gamme</span></label>
         <label class="chip"><input type="checkbox" data-f="recent"><span>Récent</span></label>
@@ -339,6 +373,12 @@
         <label class="chip"><input type="checkbox" data-f="onlyDrop"><span>Prix en baisse</span></label>
         <label class="chip"><input type="checkbox" data-f="bailCourt"><span>Bail court</span></label>
       </div>
+    </div>
+
+    <div class="alert" id="alert" role="status" hidden>
+      <span id="alertText"></span>
+      <button id="alertSee">Voir</button>
+      <button id="alertOk">Vu</button>
     </div>
 
     <div class="meta-row">
@@ -362,7 +402,7 @@
       <div class="grid" id="grid"></div>
       <button class="more" id="more" hidden>Afficher plus</button>
       <div class="empty" id="empty" hidden>
-        <p>Aucune annonce ne correspond à ces critères.</p>
+        <p id="emptyText"></p>
         <button class="btn" id="emptyReset">Réinitialiser les filtres</button>
       </div>
     </main>
@@ -480,7 +520,8 @@ function filtered() {
     // n'apparaît que quand on demande le bail court, qu'elle seule renseigne.
     && (immeuble(l) ? bailCourt : (l.area_sqm ?? 0) >= area)
     && (immeuble(l) ? bailCourt : l.bedrooms >= beds)
-    && (immeuble(l) ? bailCourt : (l.bathrooms ?? 0) >= baths)
+    // Salles de bain inconnues (résidences Renthub, qui ne les donnent pas) : pas un motif d'exclusion.
+    && (immeuble(l) ? bailCourt : (l.bathrooms ?? baths) >= baths)
     && (!bailCourt || l.min_lease_months)
     && (!dist || l.district === dist)
     && (!photo || l.photos)
@@ -525,6 +566,8 @@ function card(l) {
   ].filter(Boolean).map(esc).join(' · ');
 
   const tags = [];
+  if (alerts.has(l.url)) tags.push(`<span class="tag alert">★ ${esc(alerts.get(l.url))}</span>`);
+  if (mode === 'favs') tags.push(`<span class="tag">vue le ${esc(l.last_seen)}</span>`);
   if (d < 0) tags.push(`<span class="tag drop">↓ ${nf.format(-d)} ฿ depuis le ${esc(l.prices[0][0])}</span>`);
   // Le bail court est l'information la plus rare du projet : elle passe devant le reste.
   if (l.min_lease_months) tags.push(`<span class="tag bail">bail ${l.min_lease_months} mois</span>`);
@@ -543,7 +586,7 @@ function card(l) {
     ? `<img class="ph" src="${esc(l.photos)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.outerHTML='<div class=&quot;ph none&quot;>photo indisponible</div>'">`
     : `<div class="ph none">pas de photo</div>`;
 
-  return `<a class="card" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
+  return `<div class="cardw"><a class="card" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
     ${img}
     <div class="body">
       <div class="price">${nf.format(l.price_eur)} € <small>· ${nf.format(l.price_thb)} ฿/mois</small></div>
@@ -552,7 +595,58 @@ function card(l) {
       <div class="place">${place}</div>
       <div class="spacer"></div>
       <div class="tags">${tags.join('')}</div>
-    </div></a>`;
+    </div></a>
+    <button class="fav" data-url="${esc(l.url)}" aria-pressed="${!!favs[l.url]}" aria-label="Favori">${STAR}</button></div>`;
+}
+
+// ---- Favoris ----
+// Gardés dans ce navigateur : un favori posé sur l'iPhone n'est pas sur le PC.
+// ponytail: localStorage seul. Lien de partage ou fichier dans le dépôt si deux appareils doivent se synchroniser.
+const STAR = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>';
+const FKEY = 'brw-favoris-v1';
+let favs = {};
+try { favs = JSON.parse(localStorage.getItem(FKEY)) || {}; } catch {}
+const saveFavs = () => { try { localStorage.setItem(FKEY, JSON.stringify(favs)); } catch {} };
+const BY_URL = new Map(DATA.map(l => [l.url, l]));
+let mode = 'all';
+
+// Le même logement republié (autre agent, autre site) : même immeuble, même nombre de chambres,
+// surface à 2 m² près, même étage quand les deux le donnent.
+const twin = (f, l) => l.url !== f.url && immKey(l) === f.imm && l.bedrooms === f.beds
+  && Math.abs((l.area_sqm ?? -99) - f.area) <= 2 && (f.floor == null || l.floor == null || l.floor === f.floor);
+
+// Alerte = depuis le dernier « Vu » (f.ack, une date de passe) : le favori est revenu après au
+// moins une passe d'absence (reappeared_on, calculé par store.py), ou un jumeau est apparu.
+let alerts = new Map();
+function computeAlerts() {
+  alerts = new Map();
+  for (const f of Object.values(favs)) {
+    const l = BY_URL.get(f.url);
+    if (l?.reappeared_on > f.ack) alerts.set(f.url, `réapparue le ${l.reappeared_on}`);
+    if (f.area == null) continue;
+    for (const x of DATA) if (x.first_seen > f.ack && twin(f, x)) alerts.set(x.url, 'nouvelle, semblable à un favori');
+  }
+}
+
+function favRows() {
+  const urls = new Set([...Object.keys(favs), ...alerts.keys()]);
+  return [...urls].map(u => BY_URL.get(u)).filter(Boolean)
+    .sort((a, b) => alerts.has(b.url) - alerts.has(a.url) || (b.last_seen ?? '').localeCompare(a.last_seen ?? ''));
+}
+
+function toggleFav(url) {
+  const l = BY_URL.get(url);
+  if (favs[url]) delete favs[url];
+  else favs[url] = { url, imm: immKey(l), beds: l.bedrooms, area: l.area_sqm, floor: l.floor, ack: META.last };
+  saveFavs(); computeAlerts(); update();
+}
+
+function setMode(m) {
+  mode = m; shown = PAGE;
+  document.body.classList.toggle('favs', m === 'favs');
+  $('tabAll').setAttribute('aria-selected', m === 'all');
+  $('tabFav').setAttribute('aria-selected', m === 'favs');
+  update(); scrollTo({ top: 0 });
 }
 
 // ---- Rendu ----
@@ -561,8 +655,13 @@ const plural = (n, w) => `${nf.format(n)} ${w}${n > 1 ? 's' : ''}`;
 let rows = [];
 
 function update({ grid = true } = {}) {
-  rows = filtered();
-  $('count').innerHTML = `<b>${nf.format(rows.length)}</b> annonce${rows.length > 1 ? 's' : ''}`;
+  rows = mode === 'favs' ? favRows() : filtered();
+  $('count').innerHTML = `<b>${nf.format(rows.length)}</b> ${mode === 'favs' ? 'favori' : 'annonce'}${rows.length > 1 ? 's' : ''}`;
+  const nFav = Object.keys(favs).length;
+  $('nFav').textContent = nFav; $('nFav').hidden = !nFav;
+  $('alert').hidden = !alerts.size;
+  $('alertText').textContent = `★ ${plural(alerts.size, 'alerte')} sur tes favoris`;
+  $('alertSee').hidden = mode === 'favs';
   $('apply').textContent = rows.length ? `Voir ${plural(rows.length, 'annonce')}` : 'Aucune annonce';
   $('vBudget').innerHTML = `${nf.format(state.budget)} € <small>${nf.format(Math.round(state.budget * META.rate))} ฿</small>`;
   $('vArea').textContent = `${state.area} m²`;
@@ -576,6 +675,9 @@ function renderGrid() {
   $('more').hidden = rows.length <= shown;
   $('more').textContent = `Afficher plus · ${plural(rows.length - shown, 'restante')}`;
   $('empty').hidden = rows.length > 0;
+  $('emptyText').textContent = mode === 'favs'
+    ? 'Aucun favori. Touche l’étoile d’une annonce pour la suivre.' : 'Aucune annonce ne correspond à ces critères.';
+  $('emptyReset').hidden = mode === 'favs';
 }
 
 // Un seul rendu par image même quand le curseur envoie des dizaines d'événements.
@@ -652,6 +754,19 @@ $('more').addEventListener('click', () => { shown += PAGE; renderGrid(); });
 // Valider la recherche referme le clavier iOS : sinon il masque la moitié des résultats.
 $('q').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 
+$('grid').addEventListener('click', e => {
+  const b = e.target.closest('.fav');
+  if (b) toggleFav(b.dataset.url);
+});
+$('tabAll').addEventListener('click', () => setMode('all'));
+$('tabFav').addEventListener('click', () => setMode('favs'));
+$('alertSee').addEventListener('click', () => setMode('favs'));
+$('alertOk').addEventListener('click', () => {
+  for (const f of Object.values(favs)) f.ack = META.last;
+  saveFavs(); computeAlerts(); update();
+});
+
+computeAlerts();
 paint();
 update();
 </script>
