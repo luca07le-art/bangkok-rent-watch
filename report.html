@@ -422,8 +422,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 // Écart entre le premier et le dernier relevé : négatif = le loyer a baissé.
 const drop = l => l.prices ? l.prices.at(-1)[1] - l.prices[0][1] : 0;
 const perSqm = l => (l.area_sqm && l.price_eur) ? l.price_eur / l.area_sqm : Infinity;
-// Une entree decrivant un batiment entier plutot qu'un logement : aucun des trois
-// criteres unitaires n'existe. C'est le cas de toute la source Renthub.
+// Une entrée décrivant un bâtiment entier plutôt qu'un logement (liste Renthub) : jamais affichée.
 const immeuble = l => l.bedrooms == null && l.area_sqm == null;
 
 // Médiane du €/m² par quartier, calculée une fois au chargement plutôt que servie dans
@@ -514,14 +513,12 @@ function filtered() {
 
   let out = DATA.filter(l =>
     (l.price_eur ?? 0) <= budget
-    // Renthub décrit des immeubles, pas des logements : ni chambres, ni salles de bain,
-    // ni surface à ce niveau — ils sont sur la fiche, par type de chambre. Une entrée
-    // sans aucun des trois n'est filtrable sur aucun critère de logement, donc elle
-    // n'apparaît que quand on demande le bail court, qu'elle seule renseigne.
-    && (immeuble(l) ? bailCourt : (l.area_sqm ?? 0) >= area)
-    && (immeuble(l) ? bailCourt : l.bedrooms >= beds)
+    // Fiches immeuble Renthub : ni chambres ni surface. Leurs logements 2 ch+ sont déjà
+    // des annonces à part entière (rooms.py, source renthub-room) ; le reste, des studios.
+    && !immeuble(l)
+    && (l.area_sqm ?? 0) >= area && l.bedrooms >= beds
     // Salles de bain inconnues (résidences Renthub, qui ne les donnent pas) : pas un motif d'exclusion.
-    && (immeuble(l) ? bailCourt : (l.bathrooms ?? baths) >= baths)
+    && (l.bathrooms ?? baths) >= baths
     && (!bailCourt || l.min_lease_months)
     && (!dist || l.district === dist)
     && (!photo || l.photos)
